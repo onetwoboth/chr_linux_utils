@@ -27,23 +27,28 @@ fn parse_args() -> (Options, PathBuf) {
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
-        if arg == "--help" {
-            print_usage();
-            process::exit(0);
-        } else if arg == "-p" {
-            opts.create_parents = true;
-        } else if arg.starts_with('-') {
-            eprintln!("Unknown option: {}", arg);
-            print_usage();
-            process::exit(2);
-        } else {
-            path = PathBuf::from(arg);
+        match arg.as_str() {
+            "--help" => {
+                print_usage();
+                process::exit(0);
+            },
+            "-p" => {
+                opts.create_parents = true;
+            },
+            _ if arg.starts_with("-") => {
+                eprintln!("Unknown option: {}", arg);
+                print_usage();
+                process::exit(2);
+            },
+            _ => {
+                path = PathBuf::from(arg);
+            }
         }
         i += 1;
     }
 
     if path.as_os_str().is_empty() {
-        eprintln!("Error: PATH is required");
+        eprintln!("Error: PATH is required.");
         print_usage();
         process::exit(2);
     }
