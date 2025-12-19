@@ -1,0 +1,6 @@
+[package]
+name = "chr_linux_utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
