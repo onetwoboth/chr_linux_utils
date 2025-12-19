@@ -1,3 +1,7 @@
 # chr_linux_utils
 
 this is a **Rust** version of basic Linux utils, which includes chrls(ls), chrmkdir(mkdir)...
+
+usage:
+- cargo build --release
+- cp ./target/release/ /usr/bin/
