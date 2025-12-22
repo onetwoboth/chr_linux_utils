@@ -7,35 +7,10 @@
 
 - `chrls` —— Rust 版 `ls`
 - `chrmkdir` —— Rust 版 `mkdir`
-- （持续扩展中……）
+- `chrrm` —— Rust 版 `rm`
 
 所有命令统一使用 `chr` 作为前缀，避免与系统自带命令冲突。
 
----
-
-## ✨ 项目目标
-
-- 使用 **Rust 标准库** 实现核心功能  
-- 学习并实践：
-  - Rust 的 binary crate / lib crate 结构
-  - Linux 文件系统与权限模型
-  - 命令行工具设计
-  - RPM 打包流程（`.spec` 文件）
-- 为后续更深入的系统工具开发打基础
-
----
-
-## 📦 项目结构
-
-```text
-chr_linux_utils/
-├── Cargo.toml
-└── src
-    ├── lib.rs        # 公共逻辑（参数解析、工具函数等）
-    └── bin
-        ├── chrls.rs  # chrls 命令入口
-        └── chrmkdir.rs # chrmkdir 命令入口
-```
 ---
 
 ## 🚀 构建方式
@@ -56,6 +31,8 @@ target/release/
 - target/release/chrls
 - target/release/chrmkdir
 
+---
+
 ## 🛠️ 安装（本地测试）
 
 将可执行文件复制到系统 PATH 目录中（如 /usr/bin）：
@@ -70,6 +47,8 @@ sudo cp target/release/chrmkdir /usr/bin/
 chrls
 chrmkdir test_dir
 ```
+
+---
 
 ## 📦 RPM 打包
 本项目提供了 RPM spec 文件，可用于在 **RHEL / Rocky Linux / AlmaLinux** 系统上构建和安装工具：
@@ -108,14 +87,14 @@ rpmdevsetuptree
 ```bash
 git archive \
   --format=tar.gz \
-  --prefix=chr_linux_utils-0.1.0/ \
+  --prefix=chr_linux_utils-0.1.1/ \
   HEAD \
-  -o chr_linux_utils-0.1.0.tar.gz
+  -o chr_linux_utils-0.1.1.tar.gz
 ```
 
 然后将生成的源码包移动到 RPM 的 SOURCES 目录：
 ```bash
-mv chr_linux_utils-0.1.0.tar.gz ~/rpmbuild/SOURCES/
+mv chr_linux_utils-0.1.1.tar.gz ~/rpmbuild/SOURCES/
 ```
 
 ### 4. 安装 SPEC 文件
@@ -141,6 +120,7 @@ sudo dnf install ~/rpmbuild/RPMS/x86_64/chr_linux_utils-*.rpm
 ```bash
 chrls
 chrmkdir
+chrrm
 ```
 
 ### 7. 注意事项
@@ -149,6 +129,8 @@ chrmkdir
 - RPM 安装的二进制文件路径为 /usr/bin。
 
 - 该打包流程遵循标准 RPM 最佳实践。
+
+---
 
 ## 🧠 说明
 - 本项目主要用于**学习和实践**
