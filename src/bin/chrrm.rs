@@ -83,17 +83,29 @@ fn parse_args() -> (Vec<String>, Options) {
     let mut targets = Vec::new();
     let mut options = Options::default();
 
-    for arg in &args[1..] {
-        match arg.as_str() {
-            "-r" => options.recursive = true,
-            "-f" => options.force = true,
-            _ if arg.starts_with("-") => {
-                eprintln!("Unknown option: {}", arg);
-                print_usage();
-                process::exit(2);
+    let mut i = 1;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--help" {
+            print_usage();
+            process::exit(0);
+        } else if arg.starts_with('-') && arg.len() > 1 {
+            // 解析组合选项，例如 -al
+            for ch in arg[1..].chars() {
+                match ch {
+                    'r' => options.recursive = true,
+                    'f' => options.force = true,
+                    _ => {
+                        eprintln!("Unknown option: -{}", ch);
+                        print_usage();
+                        process::exit(2);
+                    }
+                }
             }
-            _ => targets.push(arg.clone()),
+        } else {
+            targets.push(arg.clone());
         }
+        i += 1;
     }
 
     if targets.is_empty() {
