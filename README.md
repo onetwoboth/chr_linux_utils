@@ -71,16 +71,84 @@ chrls
 chrmkdir test_dir
 ```
 
-## 📦 RPM 打包（计划 / 进行中）
-本项目计划支持：
+## 📦 RPM 打包
+本项目提供了 RPM spec 文件，可用于在 **RHEL / Rocky Linux / AlmaLinux** 系统上构建和安装工具：
+`chrls` 和 `chrmkdir`。
 
-- 打包为 tar.gz
+### 1. 安装构建依赖
 
-- 编写 .spec 文件
+```bash
+sudo dnf install -y \
+    rpm-build \
+    rpmdevtools \
+    rust \
+    cargo \
+    git
+```
 
-- 生成并安装 .rpm 包
+### 2. 准备 RPM 构建目录
+初始化标准 RPM 构建目录：
+```bash
+rpmdevsetuptree
+```
 
-- 在 Red Hat / Rocky / CentOS 系列系统上使用
+会在你的主目录下创建以下结构：
+```text
+~/rpmbuild/
+├── BUILD
+├── BUILDROOT
+├── RPMS
+├── SOURCES
+├── SPECS
+└── SRPMS
+```
+
+### 3. 创建源码 tarball
+在项目根目录下执行：
+```bash
+git archive \
+  --format=tar.gz \
+  --prefix=chr_linux_utils-0.1.0/ \
+  HEAD \
+  -o chr_linux_utils-0.1.0.tar.gz
+```
+
+然后将生成的源码包移动到 RPM 的 SOURCES 目录：
+```bash
+mv chr_linux_utils-0.1.0.tar.gz ~/rpmbuild/SOURCES/
+```
+
+### 4. 安装 SPEC 文件
+将 spec 文件复制到 RPM 的 SPECS 目录：
+```bash
+cp chr_linux_utils.spec ~/rpmbuild/SPECS/
+```
+
+### 5. 构建 RPM 包
+```bash
+rpmbuild -ba ~/rpmbuild/SPECS/chr_linux_utils.spec
+```
+构建成功后，生成的 RPM 包会位于：
+```text
+~/rpmbuild/RPMS/x86_64/
+```
+
+### 6. 安装 RPM 包
+```bash
+sudo dnf install ~/rpmbuild/RPMS/x86_64/chr_linux_utils-*.rpm
+```
+安装完成后，以下命令即可在系统中全局使用：
+```bash
+chrls
+chrmkdir
+```
+
+### 7. 注意事项
+- 本项目默认禁用了调试信息包（debuginfo）。
+
+- RPM 安装的二进制文件路径为 /usr/bin。
+
+- 该打包流程遵循标准 RPM 最佳实践。
 
 ## 🧠 说明
 - 本项目主要用于**学习和实践**
