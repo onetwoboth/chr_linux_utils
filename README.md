@@ -35,7 +35,7 @@ chr_linux_utils/
     └── bin
         ├── chrls.rs  # chrls 命令入口
         └── chrmkdir.rs # chrmkdir 命令入口
-
+```
 ---
 
 ## 🚀 构建方式
@@ -44,11 +44,13 @@ chr_linux_utils/
 
 ```bash
 cargo build --release
+```
 
 构建完成后，可执行文件位于：
 
 ```rust
 target/release/
+```
 
 例如：
 - target/release/chrls
@@ -61,11 +63,13 @@ target/release/
 ```bash
 sudo cp target/release/chrls /usr/bin/
 sudo cp target/release/chrmkdir /usr/bin/
+```
 
 然后即可直接使用：
 ```bash
 chrls
 chrmkdir test_dir
+```
 
 ## 📦 RPM 打包（计划 / 进行中）
 本项目计划支持：
