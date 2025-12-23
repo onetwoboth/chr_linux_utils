@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Options {
     recursive: bool,
     force: bool,
@@ -67,17 +67,18 @@ fn chrrm(path: &Path, options: &Options) -> io::Result<()> {
 }
 
 // 解析命令行参数
-fn parse_args() -> (Vec<String>, Options) {
-    let args: Vec<String> = env::args().collect();
+fn parse_args<I>(args: I) -> Result<(Vec<String>, Options), i32>
+where
+    I: IntoIterator<Item = String>,
+{
+    let args: Vec<String> = args.into_iter().collect();
 
     if args.len() < 2 {
-        print_usage();
-        process::exit(2);
+        return Err(2);
     }
 
     if args.contains(&"--help".to_string()) {
-        print_usage();
-        process::exit(0);
+        return Err(0);
     }
 
     let mut targets = Vec::new();
@@ -86,50 +87,130 @@ fn parse_args() -> (Vec<String>, Options) {
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
-        if arg == "--help" {
-            print_usage();
-            process::exit(0);
-        } else if arg.starts_with('-') && arg.len() > 1 {
-            // 解析组合选项，例如 -al
+
+        if arg.starts_with('-') && arg.len() > 1 {
             for ch in arg[1..].chars() {
                 match ch {
                     'r' => options.recursive = true,
                     'f' => options.force = true,
-                    _ => {
-                        eprintln!("Unknown option: -{}", ch);
-                        print_usage();
-                        process::exit(2);
-                    }
+                    _ => return Err(2),
                 }
             }
         } else {
             targets.push(arg.clone());
         }
+
         i += 1;
     }
 
     if targets.is_empty() {
-        eprintln!("chrrm: missing operand");
-        print_usage();
-        process::exit(2);
+        return Err(2);
     }
 
-    (targets, options)
+    Ok((targets, options))
 }
 
-fn main() {
-    let (targets, options) = parse_args();
-    let mut exit_code = 0;
 
-    for t in targets {
-        let path = Path::new(&t);
-        if let Err(e) = chrrm(path, &options) {
-            if !options.force {
-                eprintln!("chrrm: failed to remove '{}': {}", t, e);
+fn main() {
+    match parse_args(env::args()) {
+        Ok((targets, options)) => {
+            let mut exit_code = 0;
+
+            for t in targets {
+                let path = Path::new(&t);
+                if let Err(e) = chrrm(path, &options) {
+                    if !options.force {
+                        eprintln!("chrrm: failed to remove '{}': {}", t, e);
+                    }
+                    exit_code = 1;
+                }
             }
-            exit_code = 1;
+
+            process::exit(exit_code);
+        }
+        Err(code) => {
+            if code == 0 {
+                print_usage();
+            } else {
+                eprintln!("chrrm: invalid arguments");
+                print_usage();
+            }
+            process::exit(code);
         }
     }
+}
 
-    process::exit(exit_code);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(v: &str) -> String {
+        v.to_string()
+    }
+
+    #[test]
+    fn parse_single_target() {
+        let args = vec![s("chrrm"), s("file.txt")];
+
+        let (targets, options) = parse_args(args).unwrap();
+
+        assert_eq!(targets, vec!["file.txt"]);
+        assert!(!options.recursive);
+        assert!(!options.force);
+    }
+
+    #[test]
+    fn parse_recursive_force_combined() {
+        let args = vec![s("chrrm"), s("-rf"), s("a"), s("b")];
+
+        let (targets, options) = parse_args(args).unwrap();
+
+        assert_eq!(targets, vec!["a", "b"]);
+        assert!(options.recursive);
+        assert!(options.force);
+    }
+
+    #[test]
+    fn parse_separate_flags() {
+        let args = vec![s("chrrm"), s("-r"), s("-f"), s("dir")];
+
+        let (targets, options) = parse_args(args).unwrap();
+
+        assert_eq!(targets, vec!["dir"]);
+        assert!(options.recursive);
+        assert!(options.force);
+    }
+
+    #[test]
+    fn help_flag_returns_zero() {
+        let args = vec![s("chrrm"), s("--help")];
+
+        let err = parse_args(args).unwrap_err();
+        assert_eq!(err, 0);
+    }
+
+    #[test]
+    fn missing_operand_returns_error() {
+        let args = vec![s("chrrm"), s("-r")];
+
+        let err = parse_args(args).unwrap_err();
+        assert_eq!(err, 2);
+    }
+
+    #[test]
+    fn unknown_option_returns_error() {
+        let args = vec![s("chrrm"), s("-x"), s("file")];
+
+        let err = parse_args(args).unwrap_err();
+        assert_eq!(err, 2);
+    }
+
+    #[test]
+    fn dash_dash_treated_as_target() {
+        let args = vec![s("chrrm"), s("--"), s("file")];
+
+        let err = parse_args(args).unwrap_err();
+        assert_eq!(err, 2);
+    }
 }
