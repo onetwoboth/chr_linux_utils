@@ -13,48 +13,45 @@ fn print_usage() {
 }
 
 /// 命令选项
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq, Eq)]
 struct Options {
     create_parents: bool,
 }
 
 /// 解析命令行参数
-fn parse_args() -> (Options, PathBuf) {
-    let args: Vec<String> = env::args().collect();
+fn parse_args<I>(args: I) -> Result<(Options, PathBuf), i32>
+where
+    I: IntoIterator<Item = String>,
+{
+    let args: Vec<String> = args.into_iter().collect();
     let mut opts = Options::default();
-    let mut path = PathBuf::new();
+    let mut path: Option<PathBuf> = None;
 
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
         match arg.as_str() {
-            "--help" => {
-                print_usage();
-                process::exit(0);
-            },
+            "--help" => return Err(0),
             "-p" => {
                 opts.create_parents = true;
-            },
-            _ if arg.starts_with("-") => {
-                eprintln!("Unknown option: {}", arg);
-                print_usage();
-                process::exit(2);
-            },
+            }
+            _ if arg.starts_with('-') => {
+                return Err(2);
+            }
             _ => {
-                path = PathBuf::from(arg);
+                path = Some(PathBuf::from(arg));
             }
         }
         i += 1;
     }
 
-    if path.as_os_str().is_empty() {
-        eprintln!("Error: PATH is required.");
-        print_usage();
-        process::exit(2);
+    if let Some(p) = path {
+        Ok((opts, p))
+    } else {
+        Err(2)
     }
-
-    (opts, path)
 }
+
 
 /// chrmkdir 核心逻辑
 fn chrmkdir(path: &Path, opts: &Options) -> io::Result<()> {
@@ -67,10 +64,70 @@ fn chrmkdir(path: &Path, opts: &Options) -> io::Result<()> {
 }
 
 fn main() {
-    let (opts, path) = parse_args();
+    match parse_args(env::args()) {
+        Ok((opts, path)) => {
+            if let Err(err) = chrmkdir(&path, &opts) {
+                eprintln!("chrmkdir: {}", err);
+                process::exit(1);
+            }
+        }
+        Err(code) => {
+            if code == 0 {
+                print_usage();
+            } else {
+                eprintln!("Error: invalid arguments");
+                print_usage();
+            }
+            process::exit(code);
+        }
+    }
+}
 
-    if let Err(err) = chrmkdir(&path, &opts) {
-        eprintln!("chrmkdir: {}", err);
-        process::exit(1);
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    fn s(v: &str) -> String {
+        v.to_string()
+    }
+
+    #[test]
+    fn parse_no_flag() {
+        let args = vec![s("chrmkdir"), s("dir")];
+        let (opts, path) = parse_args(args).unwrap();
+        assert!(!opts.create_parents);
+        assert_eq!(path, PathBuf::from("dir"));
+    }
+
+    #[test]
+    fn parse_p_flag_and_path() {
+        let args = vec![s("chrmkdir"), s("-p"), s("dir")];
+
+        let (opts, path) = parse_args(args).unwrap();
+
+        assert!(opts.create_parents);
+        assert_eq!(path, PathBuf::from("dir"));
+    }
+
+    #[test]
+    fn parse_help() {
+        let args = vec![s("chrmkdir"), s("--help")];
+        let code = parse_args(args).unwrap_err();
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn missing_path() {
+        let args = vec![s("chrmkdir"), s("-p")];
+        let code = parse_args(args).unwrap_err();
+        assert_eq!(code, 2);
+    }
+
+    #[test]
+    fn invalid_flag() {
+        let args = vec![s("chrmkdir"), s("-x"), s("dir")];
+        let code = parse_args(args).unwrap_err();
+        assert_eq!(code, 2);
     }
 }
