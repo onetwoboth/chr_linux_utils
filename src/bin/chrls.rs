@@ -22,8 +22,14 @@ struct Options {
     long_format: bool,
 }
 
+#[derive(PartialEq, Debug)]
+enum ParseError {
+    Help,
+    UnknownOption(char),
+}
+
 /// 解析命令行参数
-fn parse_args<I>(args: I) -> Result<(Options, PathBuf), i32>
+fn parse_args<I>(args: I) -> Result<(Options, PathBuf), ParseError>
 where
     I: IntoIterator<Item = String>,
 {
@@ -36,14 +42,15 @@ where
         let arg = &args[i];
 
         if arg == "--help" {
-            return Err(0);
+            return Err(ParseError::Help);
         } else if arg.starts_with('-') && arg.len() > 1 {
             // 解析组合选项，例如 -al
             for ch in arg[1..].chars() {
                 match ch {
                     'a' => opts.show_hidden = true,
                     'l' => opts.long_format = true,
-                    _ => return Err(2), // 未知选项
+                    // 未知选项
+                    _ => return Err(ParseError::UnknownOption(ch)),
                 }
             }
         } else {
@@ -147,16 +154,15 @@ fn main() {
                 process::exit(1);
             }
         },
-        Err(code) => {
-            if code == 0 {
-                print_usage();
-                process::exit(0);
-            } else {
-                eprintln!("chrls: invalid arguments");
-                print_usage();
-                process::exit(2);
-            }
-        }
+        Err(ParseError::Help) => {
+            print_usage();
+            process::exit(0);
+        },
+        Err(ParseError::UnknownOption(ch)) => {
+            eprintln!("chrls: unknown option '-{}'", ch);
+            print_usage();
+            process::exit(2);
+        },
     }
 }
 
@@ -227,14 +233,14 @@ mod tests {
     #[test]
     fn help_returns_err_0() {
         let args = vec![String::from("chrls"), String::from("--help")];
-        let code = parse_args(args).unwrap_err();
-        assert_eq!(code, 0);
+        let error = parse_args(args).unwrap_err();
+        assert_eq!(error, ParseError::Help);
     }
 
     #[test]
     fn unknown_option_returns_err_2() {
-        let args = vec![String::from("chrls"), String::from("-xs")];
-        let code = parse_args(args).unwrap_err();
-        assert_eq!(code, 2);
+        let args = vec![String::from("chrls"), String::from("-alx")];
+        let error = parse_args(args).unwrap_err();
+        assert_eq!(error, ParseError::UnknownOption('x'));
     }
 }

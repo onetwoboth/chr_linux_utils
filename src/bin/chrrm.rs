@@ -11,6 +11,13 @@ struct Options {
     force: bool,
 }
 
+#[derive(PartialEq, Debug)]
+enum ParseError {
+    Help,
+    UnknownOption(char),
+    MissingOperand,
+}
+
 // 打印用法
 fn print_usage() {
     eprintln!("Usage: chrrm [OPTIONS] FILE");
@@ -67,18 +74,14 @@ fn chrrm(path: &Path, options: &Options) -> io::Result<()> {
 }
 
 // 解析命令行参数
-fn parse_args<I>(args: I) -> Result<(Vec<String>, Options), i32>
+fn parse_args<I>(args: I) -> Result<(Vec<String>, Options), ParseError>
 where
     I: IntoIterator<Item = String>,
 {
     let args: Vec<String> = args.into_iter().collect();
 
     if args.len() < 2 {
-        return Err(2);
-    }
-
-    if args.contains(&"--help".to_string()) {
-        return Err(0);
+        return Err(ParseError::MissingOperand);
     }
 
     let mut targets = Vec::new();
@@ -87,13 +90,14 @@ where
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
-
-        if arg.starts_with('-') && arg.len() > 1 {
+        if arg == "--help" {
+            return Err(ParseError::Help);
+        } else if arg.starts_with('-') && arg.len() > 1 {
             for ch in arg[1..].chars() {
                 match ch {
                     'r' => options.recursive = true,
                     'f' => options.force = true,
-                    _ => return Err(2),
+                    _ => return Err(ParseError::UnknownOption(ch)),
                 }
             }
         } else {
@@ -104,7 +108,7 @@ where
     }
 
     if targets.is_empty() {
-        return Err(2);
+        return Err(ParseError::MissingOperand);
     }
 
     Ok((targets, options))
@@ -127,15 +131,20 @@ fn main() {
             }
 
             process::exit(exit_code);
-        }
-        Err(code) => {
-            if code == 0 {
-                print_usage();
-            } else {
-                eprintln!("chrrm: invalid arguments");
-                print_usage();
-            }
-            process::exit(code);
+        },
+        Err(ParseError::Help) => {
+            print_usage();
+            process::exit(0);
+        },
+        Err(ParseError::UnknownOption(ch)) => {
+            eprintln!("chrrm: unknown option '-{}'", ch);
+            print_usage();
+            process::exit(2);
+        },
+        Err(ParseError::MissingOperand) => {
+            eprintln!("chrrm: missing operand");
+            print_usage();
+            process::exit(2);
         }
     }
 }
@@ -187,7 +196,7 @@ mod tests {
         let args = vec![s("chrrm"), s("--help")];
 
         let err = parse_args(args).unwrap_err();
-        assert_eq!(err, 0);
+        assert_eq!(err, ParseError::Help);
     }
 
     #[test]
@@ -195,7 +204,7 @@ mod tests {
         let args = vec![s("chrrm"), s("-r")];
 
         let err = parse_args(args).unwrap_err();
-        assert_eq!(err, 2);
+        assert_eq!(err, ParseError::MissingOperand);
     }
 
     #[test]
@@ -203,7 +212,7 @@ mod tests {
         let args = vec![s("chrrm"), s("-x"), s("file")];
 
         let err = parse_args(args).unwrap_err();
-        assert_eq!(err, 2);
+        assert_eq!(err, ParseError::UnknownOption('x'));
     }
 
     #[test]
@@ -211,6 +220,6 @@ mod tests {
         let args = vec![s("chrrm"), s("--"), s("file")];
 
         let err = parse_args(args).unwrap_err();
-        assert_eq!(err, 2);
+        assert_eq!(err, ParseError::UnknownOption('-'));
     }
 }

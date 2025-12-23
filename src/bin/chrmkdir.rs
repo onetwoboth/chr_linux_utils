@@ -18,8 +18,15 @@ struct Options {
     create_parents: bool,
 }
 
+#[derive(PartialEq, Debug)]
+enum ParseError {
+    Help,
+    UnknownOption(char),
+    MissingOperand,
+}
+
 /// 解析命令行参数
-fn parse_args<I>(args: I) -> Result<(Options, PathBuf), i32>
+fn parse_args<I>(args: I) -> Result<(Options, PathBuf), ParseError>
 where
     I: IntoIterator<Item = String>,
 {
@@ -30,17 +37,17 @@ where
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
-        match arg.as_str() {
-            "--help" => return Err(0),
-            "-p" => {
-                opts.create_parents = true;
+        if arg == "--help" {
+            return Err(ParseError::Help);
+        } else if arg.starts_with("-") {
+            for ch in arg[1..].chars() {
+                match ch {
+                    'p' => opts.create_parents = true,
+                    _ => return Err(ParseError::UnknownOption(ch)),
+                }
             }
-            _ if arg.starts_with('-') => {
-                return Err(2);
-            }
-            _ => {
-                path = Some(PathBuf::from(arg));
-            }
+        } else {
+            path = Some(PathBuf::from(arg));
         }
         i += 1;
     }
@@ -48,7 +55,7 @@ where
     if let Some(p) = path {
         Ok((opts, p))
     } else {
-        Err(2)
+        Err(ParseError::MissingOperand)
     }
 }
 
@@ -70,15 +77,20 @@ fn main() {
                 eprintln!("chrmkdir: {}", err);
                 process::exit(1);
             }
-        }
-        Err(code) => {
-            if code == 0 {
-                print_usage();
-            } else {
-                eprintln!("Error: invalid arguments");
-                print_usage();
-            }
-            process::exit(code);
+        },
+        Err(ParseError::Help) => {
+            print_usage();
+            process::exit(0);
+        },
+        Err(ParseError::UnknownOption(ch)) => {
+            eprintln!("chrmkdir: unknown option '-{}'", ch);
+            print_usage();
+            process::exit(2);
+        },
+        Err(ParseError::MissingOperand) => {
+            eprintln!("chrmkdir: missing operand");
+            print_usage();
+            process::exit(2);
         }
     }
 }
@@ -113,21 +125,21 @@ mod tests {
     #[test]
     fn parse_help() {
         let args = vec![s("chrmkdir"), s("--help")];
-        let code = parse_args(args).unwrap_err();
-        assert_eq!(code, 0);
+        let error = parse_args(args).unwrap_err();
+        assert_eq!(error, ParseError::Help);
     }
 
     #[test]
     fn missing_path() {
         let args = vec![s("chrmkdir"), s("-p")];
-        let code = parse_args(args).unwrap_err();
-        assert_eq!(code, 2);
+        let error = parse_args(args).unwrap_err();
+        assert_eq!(error, ParseError::MissingOperand);
     }
 
     #[test]
     fn invalid_flag() {
         let args = vec![s("chrmkdir"), s("-x"), s("dir")];
-        let code = parse_args(args).unwrap_err();
-        assert_eq!(code, 2);
+        let error = parse_args(args).unwrap_err();
+        assert_eq!(error, ParseError::UnknownOption('x'));
     }
 }
